@@ -4,7 +4,7 @@
     {
       "type": 1,
       "content": {
-        "json": "# AVS Metrics Workbook (No Log Analytics Required)\r\n\r\nThis workbook uses **only free data sources**: Azure Resource Graph, the Azure Monitor metrics API (93-day platform metric retention), and Azure Alerts Management. No Log Analytics Workspace is required and no diagnostic settings need to be configured.\r\n\r\n**Data sources used:**\r\n- Azure Resource Graph (free) — inventory, SKU, host counts, networking, datastores\r\n- Azure Monitor platform metrics (free, 93-day retention) — CPU, memory, vSAN, datastore charts\r\n- Azure Alerts Management (free) — active alerts on AVS resources\r\n\r\n**Limitations vs. LAW-based workbooks:** no syslog visibility, no NSX firewall logs, no log-search alerts, single charts capped at 30 days (data still retained 93 days, just pan the time picker)."
+        "json": "# AVS Monitoring Workbook (No Log Analytics Required)\r\n\r\nFull-coverage Azure VMware Solution monitoring using **only free data sources**: Azure Resource Graph, Azure Monitor platform metrics API (93-day retention), Azure Alerts Management, and ARM REST endpoints. No Log Analytics Workspace, no diagnostic settings, no ingestion costs.\r\n\r\n**All supported AVS platform metrics are charted** ([reference](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-avs-privateclouds-metrics))."
       },
       "name": "text - intro"
     },
@@ -19,9 +19,7 @@
             "name": "TimeRange",
             "type": 4,
             "isRequired": true,
-            "value": {
-              "durationMs": 86400000
-            },
+            "value": { "durationMs": 86400000 },
             "typeSettings": {
               "selectableValues": [
                 { "durationMs": 3600000 },
@@ -30,7 +28,8 @@
                 { "durationMs": 86400000 },
                 { "durationMs": 172800000 },
                 { "durationMs": 604800000 },
-                { "durationMs": 2592000000 }
+                { "durationMs": 2592000000 },
+                { "durationMs": 7776000000 }
               ],
               "allowCustom": true
             }
@@ -88,36 +87,33 @@
         "style": "tabs",
         "links": [
           { "id": "tab-overview", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "Overview", "subTarget": "Overview", "style": "link" },
-          { "id": "tab-performance", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "Performance", "subTarget": "Performance", "style": "link" },
+          { "id": "tab-cpu", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "CPU", "subTarget": "CPU", "style": "link" },
+          { "id": "tab-memory", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "Memory", "subTarget": "Memory", "style": "link" },
           { "id": "tab-storage", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "Storage", "subTarget": "Storage", "style": "link" },
+          { "id": "tab-networking", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "Networking", "subTarget": "Networking", "style": "link" },
+          { "id": "tab-arc", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "Arc Resources", "subTarget": "Arc", "style": "link" },
           { "id": "tab-capacity", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "Capacity & Inventory", "subTarget": "Capacity", "style": "link" },
-          { "id": "tab-alerts", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "Alerts", "subTarget": "Alerts", "style": "link" }
+          { "id": "tab-alerts", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "Alerts & Advisor", "subTarget": "Alerts", "style": "link" },
+          { "id": "tab-map", "cellValue": "Tab", "linkTarget": "parameter", "linkLabel": "AVS Map", "subTarget": "AVSMap", "style": "link" }
         ]
       },
       "name": "tabs"
     },
+
     {
       "type": 12,
       "content": {
         "version": "NotebookGroup/1.0",
         "groupType": "editable",
         "items": [
-          {
-            "type": 1,
-            "content": {
-              "json": "## Overview\r\nAt-a-glance health of your AVS estate. All data sourced from Azure Resource Graph and Alerts Management (free)."
-            },
-            "name": "text - overview-header"
-          },
+          { "type": 1, "content": { "json": "## Overview\r\nAt-a-glance health of your AVS estate. Resource Graph + Alerts Management + free metrics API." }, "name": "ovw-header" },
           {
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
               "query": "resources\r\n| where type =~ 'microsoft.avs/privateclouds'\r\n| where id in ({AVSInstance})\r\n| count\r\n| project Label = 'Private Clouds', Value = Count",
-              "size": 4,
-              "title": "Private Clouds",
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "size": 4, "title": "Private Clouds",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "tiles",
               "tileSettings": {
@@ -126,18 +122,15 @@
                 "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "blue" } }
               }
             },
-            "customWidth": "25",
-            "name": "kpi-pcs"
+            "customWidth": "25", "name": "kpi-pcs"
           },
           {
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
               "query": "resources\r\n| where type =~ 'microsoft.avs/privateclouds/clusters' or (type =~ 'microsoft.avs/privateclouds' and id in ({AVSInstance}))\r\n| extend clusterSize = iff(type =~ 'microsoft.avs/privateclouds', toint(properties.managementCluster.clusterSize), toint(properties.clusterSize))\r\n| summarize TotalHosts = sum(clusterSize)\r\n| project Label = 'Hosts', Value = TotalHosts",
-              "size": 4,
-              "title": "Total Hosts",
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "size": 4, "title": "Hosts",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "tiles",
               "tileSettings": {
@@ -146,18 +139,15 @@
                 "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "green" } }
               }
             },
-            "customWidth": "25",
-            "name": "kpi-hosts"
+            "customWidth": "25", "name": "kpi-hosts"
           },
           {
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
               "query": "resources\r\n| where type =~ 'microsoft.avs/privateclouds/clusters' or (type =~ 'microsoft.avs/privateclouds' and id in ({AVSInstance}))\r\n| count\r\n| project Label = 'Clusters', Value = Count",
-              "size": 4,
-              "title": "Total Clusters",
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "size": 4, "title": "Clusters",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "tiles",
               "tileSettings": {
@@ -166,18 +156,15 @@
                 "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "purple" } }
               }
             },
-            "customWidth": "25",
-            "name": "kpi-clusters"
+            "customWidth": "25", "name": "kpi-clusters"
           },
           {
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
               "query": "alertsmanagementresources\r\n| where type =~ 'microsoft.alertsmanagement/alerts'\r\n| where properties.essentials.targetResourceType =~ 'microsoft.avs/privateclouds'\r\n| where properties.essentials.alertState in~ ('New', 'Acknowledged')\r\n| count\r\n| project Label = 'Active Alerts', Value = Count",
-              "size": 4,
-              "title": "Active Alerts",
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "size": 4, "title": "Active Alerts",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "tiles",
               "tileSettings": {
@@ -186,58 +173,24 @@
                 "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "redBright" } }
               }
             },
-            "customWidth": "25",
-            "name": "kpi-alerts"
+            "customWidth": "25", "name": "kpi-alerts"
           },
           {
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
-              "query": "resources\r\n| where type =~ 'microsoft.avs/privateclouds'\r\n| where id in ({AVSInstance})\r\n| extend provisioningState = tostring(properties.provisioningState)\r\n| extend internet = tostring(properties.internet)\r\n| extend skuName = tostring(sku.name)\r\n| extend clusterSize = toint(properties.managementCluster.clusterSize)\r\n| extend hasCircuit = iff(isnotempty(tostring(properties.circuit.expressRoutePrivatePeeringId)), 'Connected', 'Not Connected')\r\n| project name, resourceGroup, location, provisioningState, skuName, clusterSize, internet, hasCircuit",
-              "size": 0,
-              "title": "Private Cloud Health Status",
+              "query": "resources\r\n| where type =~ 'microsoft.avs/privateclouds'\r\n| where id in ({AVSInstance})\r\n| extend provisioningState = tostring(properties.provisioningState)\r\n| extend internet = tostring(properties.internet)\r\n| extend availability = tostring(properties.availability.strategy)\r\n| extend skuName = tostring(sku.name)\r\n| extend clusterSize = toint(properties.managementCluster.clusterSize)\r\n| extend hasCircuit = iff(isnotempty(tostring(properties.circuit.expressRoutePrivatePeeringId)), 'Connected', 'Not Connected')\r\n| project name, resourceGroup, location, provisioningState, skuName, clusterSize, internet, availability, hasCircuit",
+              "size": 0, "title": "Private Cloud Health Status",
               "noDataMessage": "No AVS Private Clouds found in selected subscription(s)",
               "showExportToExcel": true,
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "table",
               "gridSettings": {
                 "formatters": [
-                  {
-                    "columnMatch": "provisioningState",
-                    "formatter": 18,
-                    "formatOptions": {
-                      "thresholdsOptions": "icons",
-                      "thresholdsGrid": [
-                        { "operator": "==", "thresholdValue": "Succeeded", "representation": "success", "text": "{0}{1}" },
-                        { "operator": "==", "thresholdValue": "Failed", "representation": "3", "text": "{0}{1}" },
-                        { "operator": "Default", "thresholdValue": null, "representation": "warning", "text": "{0}{1}" }
-                      ]
-                    }
-                  },
-                  {
-                    "columnMatch": "internet",
-                    "formatter": 18,
-                    "formatOptions": {
-                      "thresholdsOptions": "icons",
-                      "thresholdsGrid": [
-                        { "operator": "==", "thresholdValue": "Enabled", "representation": "success", "text": "{0}{1}" },
-                        { "operator": "Default", "thresholdValue": null, "representation": "disabled", "text": "{0}{1}" }
-                      ]
-                    }
-                  },
-                  {
-                    "columnMatch": "hasCircuit",
-                    "formatter": 18,
-                    "formatOptions": {
-                      "thresholdsOptions": "icons",
-                      "thresholdsGrid": [
-                        { "operator": "==", "thresholdValue": "Connected", "representation": "success", "text": "{0}{1}" },
-                        { "operator": "Default", "thresholdValue": null, "representation": "warning", "text": "{0}{1}" }
-                      ]
-                    }
-                  },
+                  { "columnMatch": "provisioningState", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Succeeded", "representation": "success", "text": "{0}{1}" }, { "operator": "==", "thresholdValue": "Failed", "representation": "3", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "warning", "text": "{0}{1}" } ] } },
+                  { "columnMatch": "internet", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Enabled", "representation": "success", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "disabled", "text": "{0}{1}" } ] } },
+                  { "columnMatch": "hasCircuit", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Connected", "representation": "success", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "warning", "text": "{0}{1}" } ] } },
                   { "columnMatch": "clusterSize", "formatter": 4, "formatOptions": { "palette": "blue" } }
                 ],
                 "filter": true,
@@ -249,404 +202,349 @@
                   { "columnId": "skuName", "label": "SKU" },
                   { "columnId": "clusterSize", "label": "Hosts" },
                   { "columnId": "internet", "label": "Internet" },
+                  { "columnId": "availability", "label": "Availability" },
                   { "columnId": "hasCircuit", "label": "ExpressRoute" }
                 ]
               }
             },
-            "name": "table-health"
+            "name": "ovw-health"
           },
           {
             "type": 10,
             "content": {
-              "chartId": "ovw-cpu-trend",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 86400000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--CpuUsageAverage",
-                  "aggregation": 4,
-                  "splitBy": [ "clustername" ]
-                }
-              ],
-              "title": "CPU Utilization (%) by Cluster",
-              "showRefreshButton": true
+              "chartId": "ovw-cpu", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--CpuUsageAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "CPU Usage (%) by Cluster", "showRefreshButton": true
             },
-            "customWidth": "50",
-            "name": "metric-cpu"
+            "customWidth": "33", "name": "ovw-cpu"
           },
           {
             "type": 10,
             "content": {
-              "chartId": "ovw-mem-trend",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 86400000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--MemUsageAverage",
-                  "aggregation": 4,
-                  "splitBy": [ "clustername" ]
-                }
-              ],
-              "title": "Memory Utilization (%) by Cluster",
-              "showRefreshButton": true
+              "chartId": "ovw-mem", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--MemUsageAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Memory Usage (%) by Cluster", "showRefreshButton": true
             },
-            "customWidth": "50",
-            "name": "metric-mem"
+            "customWidth": "33", "name": "ovw-mem"
           },
           {
             "type": 10,
             "content": {
-              "chartId": "ovw-vsan",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 86400000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--DiskUsedPercentage",
-                  "aggregation": 4,
-                  "splitBy": [ "dsname" ]
-                }
-              ],
-              "title": "vSAN Datastore Used (%) by Datastore",
-              "showRefreshButton": true
+              "chartId": "ovw-disk", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--DiskUsedPercentage", "aggregation": 4, "splitBy": [ "dsname" ] } ],
+              "title": "Datastore Used (%) by Datastore", "showRefreshButton": true
             },
-            "name": "metric-vsan"
+            "customWidth": "33", "name": "ovw-disk"
           }
         ]
       },
       "conditionalVisibility": { "parameterName": "Tab", "comparison": "isEqualTo", "value": "Overview" },
       "name": "group-overview"
     },
+
     {
       "type": 12,
       "content": {
         "version": "NotebookGroup/1.0",
         "groupType": "editable",
         "items": [
+          { "type": 1, "content": { "json": "## CPU Metrics\r\nAll supported AVS CPU metrics from the Azure Monitor metrics API. Both legacy (`EffectiveCpuAverage`) and new (`CpuUsageAverage`) namespace metrics included." }, "name": "cpu-header" },
           {
-            "type": 1,
-            "content": { "json": "## Performance\r\nCPU and memory metrics straight from the Azure Monitor metrics API. Free, 93-day retention. Single chart shows up to 30 days; pan the time picker to see older windows." }
+            "type": 10,
+            "content": {
+              "chartId": "cpu-new-avg", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--CpuUsageAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Percentage CPU - Average (CpuUsageAverage)", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "cpu-new-avg"
           },
           {
             "type": 10,
             "content": {
-              "chartId": "perf-cpu-avg",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 86400000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--CpuUsageAverage",
-                  "aggregation": 4,
-                  "splitBy": [ "clustername" ]
-                }
-              ],
-              "title": "CPU Average (%) by Cluster",
-              "showRefreshButton": true
+              "chartId": "cpu-new-max", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--CpuUsageAverage", "aggregation": 3, "splitBy": [ "clustername" ] } ],
+              "title": "Percentage CPU - Peak (CpuUsageAverage Max)", "showRefreshButton": true
             },
-            "customWidth": "50",
-            "name": "perf-cpu-avg"
+            "customWidth": "50", "name": "cpu-new-max"
           },
           {
             "type": 10,
             "content": {
-              "chartId": "perf-cpu-max",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 86400000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--CpuUsageAverage",
-                  "aggregation": 3,
-                  "splitBy": [ "clustername" ]
-                }
-              ],
-              "title": "CPU Peak (%) by Cluster",
-              "showRefreshButton": true
+              "chartId": "cpu-legacy", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--EffectiveCpuAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Percentage CPU - Legacy (EffectiveCpuAverage)", "showRefreshButton": true
             },
-            "customWidth": "50",
-            "name": "perf-cpu-max"
-          },
-          {
-            "type": 10,
-            "content": {
-              "chartId": "perf-mem-avg",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 86400000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--MemUsageAverage",
-                  "aggregation": 4,
-                  "splitBy": [ "clustername" ]
-                }
-              ],
-              "title": "Memory Average (%) by Cluster",
-              "showRefreshButton": true
-            },
-            "customWidth": "50",
-            "name": "perf-mem-avg"
-          },
-          {
-            "type": 10,
-            "content": {
-              "chartId": "perf-mem-max",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 86400000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--MemUsageAverage",
-                  "aggregation": 3,
-                  "splitBy": [ "clustername" ]
-                }
-              ],
-              "title": "Memory Peak (%) by Cluster",
-              "showRefreshButton": true
-            },
-            "customWidth": "50",
-            "name": "perf-mem-max"
-          },
-          {
-            "type": 10,
-            "content": {
-              "chartId": "perf-effmem",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 86400000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--EffectiveMemAverage",
-                  "aggregation": 4,
-                  "splitBy": [ "clustername" ]
-                }
-              ],
-              "title": "Effective Memory Average (%) by Cluster",
-              "showRefreshButton": true
-            },
-            "customWidth": "50",
-            "name": "perf-effmem"
-          },
-          {
-            "type": 10,
-            "content": {
-              "chartId": "perf-overhead",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 86400000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--OverheadMemAverage",
-                  "aggregation": 4,
-                  "splitBy": [ "clustername" ]
-                }
-              ],
-              "title": "Memory Overhead Average (%) by Cluster",
-              "showRefreshButton": true
-            },
-            "customWidth": "50",
-            "name": "perf-overhead"
+            "name": "cpu-legacy"
           }
         ]
       },
-      "conditionalVisibility": { "parameterName": "Tab", "comparison": "isEqualTo", "value": "Performance" },
-      "name": "group-performance"
+      "conditionalVisibility": { "parameterName": "Tab", "comparison": "isEqualTo", "value": "CPU" },
+      "name": "group-cpu"
     },
+
     {
       "type": 12,
       "content": {
         "version": "NotebookGroup/1.0",
         "groupType": "editable",
         "items": [
+          { "type": 1, "content": { "json": "## Memory Metrics\r\nAll supported AVS memory metrics from the Azure Monitor metrics API including both legacy (`UsageAverage`, `EffectiveMemAverage`, `OverheadAverage`, `TotalMbAverage`) and new (`MemUsageAverage`, `ClusterSummaryEffectiveMemory`, `MemOverheadAverage`, `ClusterSummaryTotalMemCapacityMB`) namespace metrics." }, "name": "mem-header" },
           {
-            "type": 1,
-            "content": { "json": "## Storage\r\nvSAN datastore utilization from the platform metrics API plus external datastore inventory from Resource Graph. No LAW required." }
+            "type": 10,
+            "content": {
+              "chartId": "mem-usage-avg", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--MemUsageAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Average Memory Usage (%) - MemUsageAverage", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "mem-usage-avg"
           },
           {
             "type": 10,
             "content": {
-              "chartId": "stg-used-pct",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 172800000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--DiskUsedPercentage",
-                  "aggregation": 4,
-                  "splitBy": [ "dsname" ]
-                }
-              ],
-              "title": "Datastore Used (%) by Datastore",
-              "showRefreshButton": true
+              "chartId": "mem-usage-max", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--MemUsageAverage", "aggregation": 3, "splitBy": [ "clustername" ] } ],
+              "title": "Peak Memory Usage (%) - MemUsageAverage Max", "showRefreshButton": true
             },
-            "customWidth": "50",
-            "name": "stg-used-pct"
+            "customWidth": "50", "name": "mem-usage-max"
           },
           {
             "type": 10,
             "content": {
-              "chartId": "stg-used-gb",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 172800000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--DiskUsedLatest",
-                  "aggregation": 4,
-                  "splitBy": [ "dsname" ]
-                }
-              ],
-              "title": "Datastore Disk Used (GB) by Datastore",
-              "showRefreshButton": true
+              "chartId": "mem-effective-new", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--ClusterSummaryEffectiveMemory", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Effective Memory (Bytes) - ClusterSummaryEffectiveMemory", "showRefreshButton": true
             },
-            "customWidth": "50",
-            "name": "stg-used-gb"
+            "customWidth": "50", "name": "mem-effective-new"
           },
           {
             "type": 10,
             "content": {
-              "chartId": "stg-capacity",
-              "version": "MetricsItem/2.0",
-              "size": 0,
-              "chartType": 2,
-              "resourceType": "Microsoft.AVS/privateClouds",
-              "metricScope": 0,
-              "resourceParameter": "AVSInstance",
-              "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange",
-              "timeContext": { "durationMs": 172800000 },
-              "metrics": [
-                {
-                  "namespace": "microsoft.avs/privateclouds",
-                  "metric": "microsoft.avs/privateclouds--DiskCapacityLatest",
-                  "aggregation": 3,
-                  "splitBy": [ "dsname" ]
-                }
-              ],
-              "title": "Datastore Capacity (GB) by Datastore",
-              "showRefreshButton": true
+              "chartId": "mem-total-new", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--ClusterSummaryTotalMemCapacityMB", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Total Memory Capacity (Bytes) - ClusterSummaryTotalMemCapacityMB", "showRefreshButton": true
             },
-            "name": "stg-capacity"
+            "customWidth": "50", "name": "mem-total-new"
+          },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "mem-overhead-new", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--MemOverheadAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Memory Overhead (Bytes) - MemOverheadAverage", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "mem-overhead-new"
+          },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "mem-legacy-usage", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--UsageAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Memory Usage % - Legacy (UsageAverage)", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "mem-legacy-usage"
+          },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "mem-legacy-effective", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--EffectiveMemAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Effective Memory - Legacy (EffectiveMemAverage)", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "mem-legacy-effective"
+          },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "mem-legacy-total", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--TotalMbAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Total Memory - Legacy (TotalMbAverage)", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "mem-legacy-total"
+          },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "mem-legacy-overhead", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--OverheadAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
+              "title": "Memory Overhead - Legacy (OverheadAverage)", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "mem-legacy-overhead"
+          }
+        ]
+      },
+      "conditionalVisibility": { "parameterName": "Tab", "comparison": "isEqualTo", "value": "Memory" },
+      "name": "group-memory"
+    },
+
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "items": [
+          { "type": 1, "content": { "json": "## Storage Metrics & Datastores\r\nAll supported AVS datastore metrics: `DiskUsedPercentage`, `DiskUsedLatest`, `DiskCapacityLatest` (new namespace) and `UsedLatest`, `CapacityLatest` (legacy). Plus external datastore inventory (ANF, Elastic SAN, Pure)." }, "name": "stg-header" },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "stg-pct", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 172800000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--DiskUsedPercentage", "aggregation": 4, "splitBy": [ "dsname" ] } ],
+              "title": "Datastore Used (%) - DiskUsedPercentage", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "stg-pct"
+          },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "stg-pct-max", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 172800000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--DiskUsedPercentage", "aggregation": 3, "splitBy": [ "dsname" ] } ],
+              "title": "Datastore Used (%) - Peak", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "stg-pct-max"
+          },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "stg-used-bytes", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 172800000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--DiskUsedLatest", "aggregation": 4, "splitBy": [ "dsname" ] } ],
+              "title": "Datastore Disk Used (Bytes) - DiskUsedLatest", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "stg-used-bytes"
+          },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "stg-cap-bytes", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 172800000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--DiskCapacityLatest", "aggregation": 4, "splitBy": [ "dsname" ] } ],
+              "title": "Datastore Capacity (Bytes) - DiskCapacityLatest", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "stg-cap-bytes"
+          },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "stg-used-legacy", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 172800000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--UsedLatest", "aggregation": 4, "splitBy": [ "dsname" ] } ],
+              "title": "Datastore Used (Bytes) - Legacy (UsedLatest)", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "stg-used-legacy"
+          },
+          {
+            "type": 10,
+            "content": {
+              "chartId": "stg-cap-legacy", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
+              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
+              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 172800000 },
+              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--CapacityLatest", "aggregation": 4, "splitBy": [ "dsname" ] } ],
+              "title": "Datastore Capacity (Bytes) - Legacy (CapacityLatest)", "showRefreshButton": true
+            },
+            "customWidth": "50", "name": "stg-cap-legacy"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.avs/privateclouds'\r\n| where id in ({AVSInstance})\r\n| extend sku = tostring(sku.name)\r\n| extend hostCount = toint(properties.managementCluster.clusterSize)\r\n| extend vsanRawTB = round(hostCount * 15.4, 1)\r\n| extend vsanUsableTB = round(vsanRawTB * 0.7, 1)\r\n| extend vcenter = tostring(properties.endpoints.vcsa)\r\n| extend nsxt = tostring(properties.endpoints.nsxtManager)\r\n| project name, sku, hostCount, vsanRawTB, vsanUsableTB, vcenter, nsxt",
+              "size": 0, "title": "vSAN Capacity Estimate (per Private Cloud)",
+              "noDataMessage": "Select an AVS Private Cloud",
+              "showExportToExcel": true,
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "table",
+              "gridSettings": {
+                "formatters": [
+                  { "columnMatch": "vsanRawTB", "formatter": 4, "formatOptions": { "palette": "blue" } },
+                  { "columnMatch": "vsanUsableTB", "formatter": 4, "formatOptions": { "palette": "green" } }
+                ],
+                "filter": true,
+                "labelSettings": [
+                  { "columnId": "name", "label": "Private Cloud" },
+                  { "columnId": "sku", "label": "SKU" },
+                  { "columnId": "hostCount", "label": "Hosts" },
+                  { "columnId": "vsanRawTB", "label": "vSAN Raw (TB)" },
+                  { "columnId": "vsanUsableTB", "label": "vSAN Usable ~70% (TB)" },
+                  { "columnId": "vcenter", "label": "vCenter" },
+                  { "columnId": "nsxt", "label": "NSX-T" }
+                ]
+              }
+            },
+            "name": "stg-vsan-est"
           },
           {
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
               "query": "resources\r\n| where type == 'microsoft.avs/privateclouds/clusters/datastores'\r\n| extend pcName = tostring(split(id, '/')[8])\r\n| extend clusterName = tostring(split(id, '/')[10])\r\n| extend netAppVolume = tostring(properties.netAppVolume.id)\r\n| extend elasticSanVolume = tostring(properties.elasticSanVolume.targetIqn)\r\n| extend datastoreType = case(isnotempty(netAppVolume), 'ANF', isnotempty(elasticSanVolume), 'Elastic SAN', 'Pure Storage')\r\n| extend status = tostring(properties.status)\r\n| extend provisioningState = tostring(properties.provisioningState)\r\n| project name, pcName, clusterName, datastoreType, status, provisioningState, resourceGroup",
-              "size": 0,
-              "title": "External Datastores (ANF / Elastic SAN / Pure)",
+              "size": 0, "title": "External Datastores (ANF / Elastic SAN / Pure)",
               "noDataMessage": "No external datastores attached",
               "showExportToExcel": true,
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "table",
               "gridSettings": {
                 "formatters": [
-                  {
-                    "columnMatch": "datastoreType",
-                    "formatter": 18,
-                    "formatOptions": {
-                      "thresholdsOptions": "colors",
-                      "thresholdsGrid": [
-                        { "operator": "==", "thresholdValue": "ANF", "representation": "blue", "text": "{0}{1}" },
-                        { "operator": "==", "thresholdValue": "Elastic SAN", "representation": "purple", "text": "{0}{1}" },
-                        { "operator": "==", "thresholdValue": "Pure Storage", "representation": "orange", "text": "{0}{1}" },
-                        { "operator": "Default", "thresholdValue": null, "representation": "gray", "text": "{0}{1}" }
-                      ]
-                    }
-                  },
-                  {
-                    "columnMatch": "status",
-                    "formatter": 18,
-                    "formatOptions": {
-                      "thresholdsOptions": "icons",
-                      "thresholdsGrid": [
-                        { "operator": "==", "thresholdValue": "Accessible", "representation": "success", "text": "{0}{1}" },
-                        { "operator": "==", "thresholdValue": "Attached", "representation": "success", "text": "{0}{1}" },
-                        { "operator": "Default", "thresholdValue": null, "representation": "warning", "text": "{0}{1}" }
-                      ]
-                    }
-                  }
+                  { "columnMatch": "datastoreType", "formatter": 18, "formatOptions": { "thresholdsOptions": "colors", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "ANF", "representation": "blue", "text": "{0}{1}" }, { "operator": "==", "thresholdValue": "Elastic SAN", "representation": "purple", "text": "{0}{1}" }, { "operator": "==", "thresholdValue": "Pure Storage", "representation": "orange", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "gray", "text": "{0}{1}" } ] } },
+                  { "columnMatch": "status", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Accessible", "representation": "success", "text": "{0}{1}" }, { "operator": "==", "thresholdValue": "Attached", "representation": "success", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "warning", "text": "{0}{1}" } ] } }
                 ],
                 "filter": true
               }
@@ -658,46 +556,216 @@
       "conditionalVisibility": { "parameterName": "Tab", "comparison": "isEqualTo", "value": "Storage" },
       "name": "group-storage"
     },
+
     {
       "type": 12,
       "content": {
         "version": "NotebookGroup/1.0",
         "groupType": "editable",
         "items": [
+          { "type": 1, "content": { "json": "## Networking\r\nExpressRoute circuits, GlobalReach connections, and ExpressRoute authorizations from Azure Resource Graph." }, "name": "net-header" },
           {
-            "type": 1,
-            "content": { "json": "## Capacity & Inventory\r\nSKU breakdown, host counts, and estimated vSAN raw capacity per private cloud. All from Azure Resource Graph (free)." }
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.avs/privateclouds'\r\n| where id in ({AVSInstance})\r\n| extend circuit = properties.circuit\r\n| extend expressRouteID = tostring(circuit.expressRouteID)\r\n| extend expressRoutePrivatePeeringID = tostring(circuit.expressRoutePrivatePeeringID)\r\n| extend primarySubnet = tostring(circuit.primarySubnet)\r\n| extend secondarySubnet = tostring(circuit.secondarySubnet)\r\n| project name, location, expressRouteID, primarySubnet, secondarySubnet, subscriptionId",
+              "size": 0, "title": "ExpressRoute Circuit Information",
+              "noDataMessage": "No ExpressRoute circuits found",
+              "showExportToExcel": true,
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "table",
+              "gridSettings": {
+                "formatters": [ { "columnMatch": "expressRouteID", "formatter": 13, "formatOptions": { "linkTarget": "Resource", "showIcon": true } } ],
+                "filter": true,
+                "labelSettings": [
+                  { "columnId": "name", "label": "Private Cloud" },
+                  { "columnId": "location", "label": "Location" },
+                  { "columnId": "expressRouteID", "label": "ExpressRoute ID" },
+                  { "columnId": "primarySubnet", "label": "Primary Subnet" },
+                  { "columnId": "secondarySubnet", "label": "Secondary Subnet" }
+                ]
+              }
+            },
+            "name": "net-er"
           },
           {
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.avs/privateclouds/globalreachconnections'\r\n| extend pcName = tostring(split(id, '/')[8])\r\n| extend connectionStatus = tostring(properties.circuitConnectionStatus)\r\n| extend peerExpressRouteCircuit = tostring(properties.peerExpressRouteCircuit)\r\n| extend addressPrefix = tostring(properties.addressPrefix)\r\n| extend provisioningState = tostring(properties.provisioningState)\r\n| project name, pcName, connectionStatus, peerExpressRouteCircuit, addressPrefix, provisioningState, resourceGroup",
+              "size": 0, "title": "GlobalReach Connections",
+              "noDataMessage": "No GlobalReach connections configured",
+              "showExportToExcel": true,
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "table",
+              "gridSettings": {
+                "formatters": [
+                  { "columnMatch": "connectionStatus", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Connected", "representation": "success", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "warning", "text": "{0}{1}" } ] } },
+                  { "columnMatch": "provisioningState", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Succeeded", "representation": "success", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "warning", "text": "{0}{1}" } ] } }
+                ],
+                "filter": true
+              }
+            },
+            "name": "net-gr"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.avs/privateclouds/authorizations'\r\n| extend pcName = tostring(split(id, '/')[8])\r\n| extend expressRouteAuthorizationId = tostring(properties.expressRouteAuthorizationId)\r\n| extend provisioningState = tostring(properties.provisioningState)\r\n| project name, pcName, provisioningState, expressRouteAuthorizationId, resourceGroup",
+              "size": 0, "title": "ExpressRoute Authorizations",
+              "noDataMessage": "No ExpressRoute authorizations created",
+              "showExportToExcel": true,
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "table",
+              "gridSettings": {
+                "formatters": [ { "columnMatch": "provisioningState", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Succeeded", "representation": "success", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "warning", "text": "{0}{1}" } ] } } ],
+                "filter": true
+              }
+            },
+            "name": "net-auth"
+          }
+        ]
+      },
+      "conditionalVisibility": { "parameterName": "Tab", "comparison": "isEqualTo", "value": "Networking" },
+      "name": "group-networking"
+    },
+
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "items": [
+          { "type": 1, "content": { "json": "## Arc-enabled VMware vSphere Resources\r\nRequires [Azure Arc-enabled VMware vSphere](https://learn.microsoft.com/en-us/azure/azure-arc/vmware-vsphere/overview). For AVS, see [Deploy Arc-enabled VMware vSphere for AVS](https://learn.microsoft.com/en-us/azure/azure-vmware/deploy-arc-for-azure-vmware-solution)." }, "name": "arc-header" },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type contains 'microsoft.connectedvmwarevsphere' and type !contains 'virtualmachines' and type !contains 'virtualnetworks' and type !contains 'virtualmachinetemplates'\r\n| extend resource = tolower(tostring(split(type, '/')[1]))\r\n| summarize count() by resource",
+              "size": 4,
+              "noDataMessage": "No Arc-enabled VMware vSphere resources found",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "tiles",
+              "tileSettings": {
+                "showBorder": false,
+                "titleContent": { "columnMatch": "resource", "formatter": 1 },
+                "leftContent": { "columnMatch": "count_", "formatter": 12, "formatOptions": { "palette": "auto" } }
+              }
+            },
+            "name": "arc-tiles"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.connectedvmwarevsphere/virtualmachines'\r\n| extend osType = tostring(properties.osProfile.osType)\r\n| summarize count() by osType",
+              "size": 4, "title": "VMs by OS Type",
+              "noDataMessage": "No Arc-enabled VMware VMs found",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "piechart"
+            },
+            "customWidth": "50", "name": "arc-os"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.connectedvmwarevsphere/virtualmachines'\r\n| extend guestAgentStatus = tostring(properties.guestAgentProfile.status)\r\n| summarize GuestManaged = countif(guestAgentStatus == 'Connected'), NotManaged = countif(guestAgentStatus != 'Connected' or isempty(guestAgentStatus))\r\n| project Connected = GuestManaged, ['Not Connected'] = NotManaged",
+              "size": 4, "title": "Guest Management Status",
+              "noDataMessage": "No Arc-enabled VMware VMs found",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "tiles",
+              "tileSettings": { "showBorder": true, "titleContent": { "columnMatch": "Connected", "formatter": 1 } }
+            },
+            "customWidth": "50", "name": "arc-guest"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.connectedvmwarevsphere/virtualmachines'\r\n| extend osType = tostring(properties.osProfile.osType)\r\n| extend osName = tostring(properties.osProfile.osName)\r\n| extend toolsRunningStatus = tostring(properties.osProfile.toolsRunningStatus)\r\n| extend toolsVersion = toint(properties.osProfile.toolsVersion)\r\n| extend cores = toint(properties.hardwareProfile.numCoresPerSocket)\r\n| extend mem = toint(properties.hardwareProfile.memorySizeMB)\r\n| extend CPUs = toint(properties.hardwareProfile.numCPUs)\r\n| extend Power = tostring(properties.powerState)\r\n| extend guestAgentStatus = tostring(properties.guestAgentProfile.status)\r\n| project name, osType, osName, CPUs, cores, mem, Power, toolsRunningStatus, guestAgentStatus, resourceGroup",
+              "size": 0, "title": "Arc-Enabled VM Inventory",
+              "noDataMessage": "No Arc-enabled VMware VMs found",
+              "showExportToExcel": true,
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "table",
+              "gridSettings": {
+                "formatters": [
+                  { "columnMatch": "osType", "formatter": 18, "formatOptions": { "thresholdsOptions": "colors", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Windows", "representation": "lightBlue", "text": "{0}{1}" }, { "operator": "==", "thresholdValue": "Linux", "representation": "green", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "gray", "text": "Unknown" } ] } },
+                  { "columnMatch": "Power", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "poweredOn", "representation": "success", "text": "" }, { "operator": "Default", "thresholdValue": null, "representation": "Unavailable", "text": "" } ] } },
+                  { "columnMatch": "toolsRunningStatus", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "guestToolsRunning", "representation": "success", "text": "" }, { "operator": "Default", "thresholdValue": null, "representation": "4", "text": "" } ] } },
+                  { "columnMatch": "guestAgentStatus", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Connected", "representation": "success", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "warning", "text": "{0}{1}" } ] } }
+                ],
+                "filter": true,
+                "labelSettings": [
+                  { "columnId": "name", "label": "VM" },
+                  { "columnId": "osType", "label": "OS" },
+                  { "columnId": "osName", "label": "OS Version" },
+                  { "columnId": "CPUs", "label": "CPUs" },
+                  { "columnId": "cores", "label": "Cores" },
+                  { "columnId": "mem", "label": "Memory MB" },
+                  { "columnId": "Power", "label": "Power" },
+                  { "columnId": "toolsRunningStatus", "label": "VM Tools" },
+                  { "columnId": "guestAgentStatus", "label": "Arc Agent" }
+                ]
+              }
+            },
+            "name": "arc-vms"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.connectedvmwarevsphere/virtualmachines/extensions' or type == 'microsoft.hybridcompute/machines/extensions'\r\n| extend vmId = tostring(split(id, '/extensions')[0])\r\n| extend extensionType = tostring(properties.type)\r\n| extend provisioningState = tostring(properties.provisioningState)\r\n| extend publisher = tostring(properties.publisher)\r\n| project name, vmId, extensionType, publisher, provisioningState, resourceGroup",
+              "size": 0, "title": "Azure Extensions on Arc-Enabled VMs",
+              "noDataMessage": "No Azure extensions deployed on Arc-enabled VMs",
+              "showExportToExcel": true,
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "table",
+              "gridSettings": {
+                "formatters": [ { "columnMatch": "provisioningState", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Succeeded", "representation": "success", "text": "{0}{1}" }, { "operator": "==", "thresholdValue": "Failed", "representation": "failed", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "pending", "text": "{0}{1}" } ] } } ],
+                "filter": true
+              }
+            },
+            "name": "arc-ext"
+          }
+        ]
+      },
+      "conditionalVisibility": { "parameterName": "Tab", "comparison": "isEqualTo", "value": "Arc" },
+      "name": "group-arc"
+    },
+
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "items": [
+          { "type": 1, "content": { "json": "## Capacity & Inventory\r\nCluster inventory, SKU breakdown, and host distribution from Azure Resource Graph." }, "name": "cap-header" },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
               "query": "resources\r\n| where type == 'microsoft.avs/privateclouds' or type == 'microsoft.avs/privateclouds/clusters'\r\n| extend pcName = iff(type == 'microsoft.avs/privateclouds', name, tostring(split(id, '/')[8]))\r\n| extend clusterName = iff(type == 'microsoft.avs/privateclouds', 'Management', name)\r\n| extend clusterSize = iff(type == 'microsoft.avs/privateclouds', toint(properties.managementCluster.clusterSize), toint(properties.clusterSize))\r\n| extend skuName = tostring(sku.name)\r\n| project pcName, clusterName, clusterSize, skuName, location, resourceGroup",
-              "size": 0,
-              "title": "Cluster Inventory",
+              "size": 0, "title": "Cluster Inventory",
               "noDataMessage": "No clusters found",
               "showExportToExcel": true,
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "table",
               "gridSettings": {
                 "formatters": [
                   { "columnMatch": "clusterSize", "formatter": 4, "formatOptions": { "palette": "blue", "min": 3, "max": 16 } },
-                  {
-                    "columnMatch": "skuName",
-                    "formatter": 18,
-                    "formatOptions": {
-                      "thresholdsOptions": "colors",
-                      "thresholdsGrid": [
-                        { "operator": "contains", "thresholdValue": "AV36P", "representation": "purple", "text": "{0}{1}" },
-                        { "operator": "contains", "thresholdValue": "AV36", "representation": "blue", "text": "{0}{1}" },
-                        { "operator": "contains", "thresholdValue": "AV52", "representation": "green", "text": "{0}{1}" },
-                        { "operator": "contains", "thresholdValue": "AV64", "representation": "orange", "text": "{0}{1}" },
-                        { "operator": "Default", "thresholdValue": null, "representation": "gray", "text": "{0}{1}" }
-                      ]
-                    }
-                  }
+                  { "columnMatch": "skuName", "formatter": 18, "formatOptions": { "thresholdsOptions": "colors", "thresholdsGrid": [ { "operator": "contains", "thresholdValue": "AV36P", "representation": "purple", "text": "{0}{1}" }, { "operator": "contains", "thresholdValue": "AV36", "representation": "blue", "text": "{0}{1}" }, { "operator": "contains", "thresholdValue": "AV52", "representation": "green", "text": "{0}{1}" }, { "operator": "contains", "thresholdValue": "AV64", "representation": "orange", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "gray", "text": "{0}{1}" } ] } }
                 ],
                 "filter": true,
                 "labelSettings": [
@@ -715,124 +783,84 @@
             "content": {
               "version": "KqlItem/1.0",
               "query": "resources\r\n| where type == 'microsoft.avs/privateclouds'\r\n| where id in ({AVSInstance})\r\n| extend skuName = tostring(sku.name)\r\n| extend hostCount = toint(properties.managementCluster.clusterSize)\r\n| summarize Hosts = sum(hostCount), Clouds = count() by skuName\r\n| order by Hosts desc",
-              "size": 0,
-              "title": "SKU Distribution",
+              "size": 0, "title": "SKU Distribution (Hosts)",
               "noDataMessage": "No private clouds found",
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "barchart"
             },
-            "customWidth": "50",
-            "name": "cap-sku-dist"
+            "customWidth": "50", "name": "cap-sku"
           },
           {
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
               "query": "resources\r\n| where type == 'microsoft.avs/privateclouds'\r\n| where id in ({AVSInstance})\r\n| extend hostCount = toint(properties.managementCluster.clusterSize)\r\n| summarize Hosts = sum(hostCount) by location\r\n| order by Hosts desc",
-              "size": 0,
-              "title": "Hosts by Region",
+              "size": 0, "title": "Hosts by Region",
               "noDataMessage": "No private clouds found",
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "barchart"
             },
-            "customWidth": "50",
-            "name": "cap-region-dist"
+            "customWidth": "50", "name": "cap-region"
           }
         ]
       },
       "conditionalVisibility": { "parameterName": "Tab", "comparison": "isEqualTo", "value": "Capacity" },
       "name": "group-capacity"
     },
+
     {
       "type": 12,
       "content": {
         "version": "NotebookGroup/1.0",
         "groupType": "editable",
         "items": [
-          {
-            "type": 1,
-            "content": { "json": "## Alerts\r\nActive and recent alerts on AVS resources. Sourced from Azure Alerts Management (free, no LAW required)." }
-          },
+          { "type": 1, "content": { "json": "## Alerts & Advisor\r\nActive AVS alerts (Azure Alerts Management) and Azure Advisor recommendations. Both free." }, "name": "alerts-header" },
           {
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
               "query": "alertsmanagementresources\r\n| where type =~ 'microsoft.alertsmanagement/alerts'\r\n| where (id contains 'microsoft.avs/privatecloud') or properties.essentials.targetResourceType =~ 'microsoft.avs/privateclouds'\r\n| extend Severity = tostring(properties.essentials.severity)\r\n| summarize Count = count() by Severity\r\n| extend Label = case(Severity == 'Sev0', 'Critical', Severity == 'Sev1', 'Error', Severity == 'Sev2', 'Warning', Severity == 'Sev3', 'Informational', Severity == 'Sev4', 'Verbose', Severity)\r\n| extend SortOrder = case(Severity == 'Sev0', 0, Severity == 'Sev1', 1, Severity == 'Sev2', 2, Severity == 'Sev3', 3, 4)\r\n| sort by SortOrder asc\r\n| project Label, Count",
-              "size": 4,
-              "title": "Alerts by Severity",
+              "size": 4, "title": "Alerts by Severity",
               "noDataMessage": "No alerts - environment is healthy",
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "tiles",
               "tileSettings": {
                 "showBorder": true,
                 "titleContent": {
-                  "columnMatch": "Label",
-                  "formatter": 18,
-                  "formatOptions": {
-                    "thresholdsOptions": "icons",
-                    "thresholdsGrid": [
-                      { "operator": "==", "thresholdValue": "Critical", "representation": "Sev0", "text": "{0}{1}" },
-                      { "operator": "==", "thresholdValue": "Error", "representation": "Sev1", "text": "{0}{1}" },
-                      { "operator": "==", "thresholdValue": "Warning", "representation": "Sev2", "text": "{0}{1}" },
-                      { "operator": "==", "thresholdValue": "Informational", "representation": "Sev3", "text": "{0}{1}" },
-                      { "operator": "Default", "thresholdValue": null, "representation": "unknown", "text": "{0}{1}" }
-                    ]
-                  }
+                  "columnMatch": "Label", "formatter": 18,
+                  "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [
+                    { "operator": "==", "thresholdValue": "Critical", "representation": "Sev0", "text": "{0}{1}" },
+                    { "operator": "==", "thresholdValue": "Error", "representation": "Sev1", "text": "{0}{1}" },
+                    { "operator": "==", "thresholdValue": "Warning", "representation": "Sev2", "text": "{0}{1}" },
+                    { "operator": "==", "thresholdValue": "Informational", "representation": "Sev3", "text": "{0}{1}" },
+                    { "operator": "Default", "thresholdValue": null, "representation": "unknown", "text": "{0}{1}" }
+                  ] }
                 },
                 "leftContent": { "columnMatch": "Count", "formatter": 12, "formatOptions": { "palette": "none" } }
               }
             },
-            "name": "alert-sev-summary"
+            "name": "alert-sev"
           },
           {
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
               "query": "alertsmanagementresources\r\n| where type =~ 'microsoft.alertsmanagement/alerts'\r\n| where (id contains 'microsoft.avs/privatecloud') or properties.essentials.targetResourceType =~ 'microsoft.avs/privateclouds'\r\n| extend FireTime = todatetime(properties.essentials.startDateTime)\r\n| extend Severity = tostring(properties.essentials.severity)\r\n| extend AlertName = tostring(properties.essentials.alertRule)\r\n| extend AlertState = tostring(properties.essentials.alertState)\r\n| extend MonitorCondition = tostring(properties.essentials.monitorCondition)\r\n| extend TargetResource = tostring(properties.essentials.targetResourceName)\r\n| where FireTime {TimeRange}\r\n| project FireTime, Severity, AlertName, TargetResource, AlertState, MonitorCondition\r\n| order by FireTime desc",
-              "size": 0,
-              "title": "Alerts in Selected Time Range",
+              "size": 0, "title": "Alerts in Selected Time Range",
               "noDataMessage": "No alerts in the selected time range",
               "timeContextFromParameter": "TimeRange",
               "showExportToExcel": true,
-              "queryType": 1,
-              "resourceType": "microsoft.resourcegraph/resources",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
               "crossComponentResources": [ "{Subscription}" ],
               "visualization": "table",
               "gridSettings": {
                 "formatters": [
-                  {
-                    "columnMatch": "Severity",
-                    "formatter": 18,
-                    "formatOptions": {
-                      "thresholdsOptions": "icons",
-                      "thresholdsGrid": [
-                        { "operator": "==", "thresholdValue": "Sev0", "representation": "4", "text": "Critical" },
-                        { "operator": "==", "thresholdValue": "Sev1", "representation": "3", "text": "Error" },
-                        { "operator": "==", "thresholdValue": "Sev2", "representation": "2", "text": "Warning" },
-                        { "operator": "==", "thresholdValue": "Sev3", "representation": "1", "text": "Info" },
-                        { "operator": "Default", "thresholdValue": null, "representation": "unknown", "text": "{0}{1}" }
-                      ]
-                    }
-                  },
+                  { "columnMatch": "Severity", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Sev0", "representation": "4", "text": "Critical" }, { "operator": "==", "thresholdValue": "Sev1", "representation": "3", "text": "Error" }, { "operator": "==", "thresholdValue": "Sev2", "representation": "2", "text": "Warning" }, { "operator": "==", "thresholdValue": "Sev3", "representation": "1", "text": "Info" }, { "operator": "Default", "thresholdValue": null, "representation": "unknown", "text": "{0}{1}" } ] } },
                   { "columnMatch": "FireTime", "formatter": 6 },
-                  {
-                    "columnMatch": "MonitorCondition",
-                    "formatter": 18,
-                    "formatOptions": {
-                      "thresholdsOptions": "icons",
-                      "thresholdsGrid": [
-                        { "operator": "==", "thresholdValue": "Fired", "representation": "2", "text": "{0}{1}" },
-                        { "operator": "==", "thresholdValue": "Resolved", "representation": "success", "text": "{0}{1}" },
-                        { "operator": "Default", "thresholdValue": null, "representation": "info", "text": "{0}{1}" }
-                      ]
-                    }
-                  }
+                  { "columnMatch": "MonitorCondition", "formatter": 18, "formatOptions": { "thresholdsOptions": "icons", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "Fired", "representation": "2", "text": "{0}{1}" }, { "operator": "==", "thresholdValue": "Resolved", "representation": "success", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "info", "text": "{0}{1}" } ] } }
                 ],
                 "filter": true
               }
@@ -840,16 +868,87 @@
             "name": "alert-table"
           },
           {
-            "type": 1,
+            "type": 11,
             "content": {
-              "json": "### Recommended next steps\r\nDeploy AVS metric and service health alert rules from the Enterprise Scale for AVS repo. These create alert rules directly on platform metrics (no LAW needed):\r\n\r\n- [Deploy Metric Alerts](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAzure%2FEnterprise-Scale-for-AVS%2Fmain%2FBrownField%2FMonitoring%2FAVS-Utilization-Alerts%2FARM%2FAVSMonitor.deploy.json)\r\n- [Deploy Service Health Alerts](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAzure%2FEnterprise-Scale-for-AVS%2Fmain%2FBrownField%2FMonitoring%2FAVS-Service-Health%2FARM%2FAVSServiceHealth.deploy.json)"
+              "version": "LinkItem/1.0",
+              "style": "nav",
+              "links": [
+                { "id": "lnk-metric-alerts", "cellValue": "https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAzure%2FEnterprise-Scale-for-AVS%2Fmain%2FBrownField%2FMonitoring%2FAVS-Utilization-Alerts%2FARM%2FAVSMonitor.deploy.json", "linkTarget": "Url", "linkLabel": "Deploy AVS Metric Alerts (ESLZ)", "style": "primary" },
+                { "id": "lnk-svc-health", "cellValue": "https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAzure%2FEnterprise-Scale-for-AVS%2Fmain%2FBrownField%2FMonitoring%2FAVS-Service-Health%2FARM%2FAVSServiceHealth.deploy.json", "linkTarget": "Url", "linkLabel": "Deploy AVS Service Health Alerts (ESLZ)", "style": "secondary" }
+              ]
             },
-            "name": "alert-help"
+            "name": "alert-deploy"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "AdvisorResources\r\n| where type == 'microsoft.advisor/recommendations'\r\n| where properties.impactedField contains 'microsoft.avs' or tolower(tostring(properties.resourceMetadata)) contains 'vmware'\r\n| extend Solution = tostring(properties.shortDescription.solution)\r\n| extend Category = tostring(properties.category)\r\n| extend Impact = tostring(properties.impact)\r\n| extend LastUpdated = tostring(properties.lastUpdated)\r\n| extend Resource = tostring(properties.impactedValue)\r\n| project Resource, resourceGroup, Solution, Category, Impact, LastUpdated, subscriptionId",
+              "size": 0, "title": "Azure Advisor Recommendations for AVS",
+              "noDataMessage": "No Advisor recommendations for AVS resources",
+              "showExportToExcel": true,
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "table",
+              "gridSettings": {
+                "formatters": [
+                  { "columnMatch": "Resource", "formatter": 13, "formatOptions": { "linkTarget": "GenericDetails", "linkIsContextBlade": true, "showIcon": true } },
+                  { "columnMatch": "Impact", "formatter": 18, "formatOptions": { "thresholdsOptions": "colors", "thresholdsGrid": [ { "operator": "==", "thresholdValue": "High", "representation": "redBright", "text": "{0}{1}" }, { "operator": "==", "thresholdValue": "Medium", "representation": "yellow", "text": "{0}{1}" }, { "operator": "==", "thresholdValue": "Low", "representation": "blue", "text": "{0}{1}" }, { "operator": "Default", "thresholdValue": null, "representation": "blue", "text": "{0}{1}" } ] } },
+                  { "columnMatch": "LastUpdated", "formatter": 6 }
+                ],
+                "filter": true
+              }
+            },
+            "name": "advisor"
           }
         ]
       },
       "conditionalVisibility": { "parameterName": "Tab", "comparison": "isEqualTo", "value": "Alerts" },
       "name": "group-alerts"
+    },
+
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "loadType": "always",
+        "items": [
+          { "type": 1, "content": { "json": "## AVS Map\r\nGeographic distribution of your AVS Private Cloud instances." }, "name": "map-header" },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "where type == 'microsoft.avs/privateclouds'\r\n| where id in ({AVSInstance})\r\n| summarize count() by location",
+              "size": 3, "title": "AVS Instance Locations",
+              "noDataMessage": "No AVS instances found",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "map",
+              "mapSettings": {
+                "locInfo": "AzureLoc",
+                "locInfoColumn": "location",
+                "sizeSettings": "count_",
+                "sizeAggregation": "Sum",
+                "minSize": 20,
+                "maxSize": 70,
+                "labelSettings": "location",
+                "legendMetric": "count_",
+                "legendAggregation": "Sum",
+                "itemColorSettings": {
+                  "nodeColorField": "count_",
+                  "colorAggregation": "Sum",
+                  "type": "heatmap",
+                  "heatmapPalette": "orangeBlue"
+                }
+              }
+            },
+            "name": "map-locations"
+          }
+        ]
+      },
+      "conditionalVisibility": { "parameterName": "Tab", "comparison": "isEqualTo", "value": "AVSMap" },
+      "name": "group-map"
     }
   ],
   "fallbackResourceIds": [ "Azure Monitor" ],

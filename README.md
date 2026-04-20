@@ -10,21 +10,37 @@ Most AVS monitoring workbooks require sending platform metrics and VMware syslog
 
 | Source | What it provides | Retention |
 |---|---|---|
-| Azure Resource Graph | Inventory, SKU, host counts, networking, datastore configuration | Live |
-| Azure Monitor platform metrics API | CPU, memory, vSAN, datastore utilization | 93 days |
+| Azure Resource Graph | Inventory, SKU, host counts, networking, datastore configuration, Arc-enabled VMware vSphere | Live |
+| Azure Monitor platform metrics API | All supported AVS cluster + datastore metrics | 93 days |
 | Azure Alerts Management | Active and recent alerts on AVS resources | Per alert config |
+| Azure Advisor | Cost, reliability, and performance recommendations | Live |
+
+## Supported metrics coverage
+
+Every metric documented in the [AVS supported metrics reference](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-avs-privateclouds-metrics) is charted:
+
+**Cluster (current):** `CpuUsageAverage`, `MemUsageAverage`, `MemOverheadAverage`, `ClusterSummaryEffectiveMemory`, `ClusterSummaryTotalMemCapacityMB`
+**Cluster (legacy):** `EffectiveCpuAverage`, `EffectiveMemAverage`, `OverheadAverage`, `TotalMbAverage`, `UsageAverage`
+**Datastore (current):** `DiskUsedPercentage`, `DiskUsedLatest`, `DiskCapacityLatest`
+**Datastore (legacy):** `UsedLatest`, `CapacityLatest`
+
+All charts are split by `clustername` or `dsname` dimension, with average + peak views where useful.
 
 ## What's included
 
-The workbook ships with 5 tabs:
+The workbook ships with 9 tabs:
 
 | Tab | Content |
 |---|---|
-| **Overview** | KPI tiles (private clouds, hosts, clusters, active alerts), private cloud health table, CPU / Memory / vSAN trend charts |
-| **Performance** | CPU and memory average + peak, effective memory, memory overhead — split by cluster |
-| **Storage** | Datastore Used %, Used GB, Capacity GB charts plus external datastore inventory (ANF, Elastic SAN, Pure Cloud Block Store) |
-| **Capacity & Inventory** | Cluster table with SKU coloring, SKU distribution, hosts by region |
-| **Alerts** | Severity tiles, time-filtered alert table, deploy links for ESLZ alert templates |
+| **Overview** | KPI tiles (private clouds, hosts, clusters, active alerts), private cloud health table, CPU / Memory / Datastore trend charts |
+| **CPU** | All CPU metrics (current + legacy), average + peak, split by cluster |
+| **Memory** | All memory metrics: usage %, effective memory, total capacity, overhead — current + legacy variants |
+| **Storage** | All datastore metrics (current + legacy), vSAN capacity estimate, external datastore inventory (ANF, Elastic SAN, Pure) |
+| **Networking** | ExpressRoute Circuits, GlobalReach Connections, ExpressRoute Authorizations |
+| **Arc Resources** | Arc-enabled VMware vSphere VMs, OS distribution, guest agent status, Azure extensions inventory |
+| **Capacity & Inventory** | Cluster inventory with SKU coloring, SKU distribution, hosts by region |
+| **Alerts & Advisor** | Severity tiles, time-filtered alert table, ESLZ alert template deploy links, Azure Advisor recommendations |
+| **AVS Map** | Geographic distribution heat-map of AVS Private Cloud instances |
 
 ## Deploy
 
