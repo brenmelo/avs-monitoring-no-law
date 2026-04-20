@@ -58,13 +58,37 @@ Coming soon. For now, use the manual deployment above.
 
 ## Limitations vs. LAW-based workbooks
 
-This workbook intentionally trades a few capabilities for zero data cost. If you need any of the following, a LAW-based workbook is the right choice:
+This workbook intentionally trades several capabilities for zero data cost. If you need any of the following, a LAW-based workbook is the right choice.
 
-- **VMware syslog visibility** (vCenter, ESXi, vSAN, NSX) — requires `AVSSyslog` table in LAW
-- **NSX Distributed Firewall logs and audit trail** — requires `allLogs` diagnostic category to LAW
-- **Metric history beyond 93 days** — platform metrics API is capped at 93 days
-- **Single chart spanning more than 30 days** — chart-level cap; pan the time picker to view older windows
-- **Log-search alerts that combine metrics with logs** — requires LAW
+### Visualization limitations
+
+- **No pie charts for live utilization metrics.** Azure Workbooks' free metrics widget (`MetricsItem/2.0`) only renders line, area, bar, and scatter — not pie. Pie/donut visualizations require a `KqlItem` Resource Graph or LAW query, but the free metrics API can't be queried with KQL. The Overview tab uses pies for inventory dimensions (hosts by cluster, SKU, region) instead.
+- **No "Used vs. Free" donut math.** Computing `Used / Capacity * 100` across two metrics into a single pie slice requires KQL against `AzureMetrics` in LAW. Without LAW you get separate Used and Capacity line charts on the Storage tab.
+- **No cross-resource aggregation in a single chart.** Free metrics charts are per-resource and split by dimension; you can't `summarize` across multiple AVS instances in one visual without LAW.
+
+### Data & retention limitations
+
+- **No VMware syslog visibility** (vCenter, ESXi, vSAN, NSX) — requires the `AVSSyslog` table in LAW
+- **No NSX Distributed Firewall packet logs / audit trail** — requires the `allLogs` diagnostic category routed to LAW
+- **No vSAN component-level health, capacity tier breakdown, or dedupe ratio history** — only exposed via syslog → LAW
+- **Metric history capped at 93 days** — Azure Monitor platform metrics retention; LAW can be configured up to 12 years
+- **Single chart capped at 30 days** — pan the time picker to view older windows; LAW has no per-chart cap
+- **No 1-minute granularity beyond 30 days** — the metrics API down-samples; LAW preserves your ingested resolution
+- **No long-term trending or capacity forecasting** — needs LAW retention + `series_decompose_forecast()` KQL
+
+### Alerting & analytics limitations
+
+- **No log-search alerts** that combine metrics with logs (e.g., "CPU > 80% AND audit log shows config change") — log alerts require LAW
+- **No multi-resource KQL alerts** correlating events across multiple AVS instances
+- **No anomaly detection on metrics** — `series_decompose_anomalies()` and ML KQL functions need LAW
+- **No custom KPIs from joined data** (e.g., joining metrics with Azure Activity events) — needs LAW
+- **No forensic / post-incident investigation of audit events** — the Azure Activity log is free for 90 days but can't be retained or queried with KQL beyond that without LAW
+
+### Security & compliance limitations
+
+- **No security analytics on AVS** (Microsoft Sentinel, custom detections) — Sentinel sits on top of LAW
+- **No long-term audit retention for compliance** (SOC 2, PCI, HIPAA) — typically requires 1+ year LAW retention
+- **No NSX firewall rule-hit telemetry** for zero-trust validation — requires syslog → LAW
 
 ## Recommended companion
 
