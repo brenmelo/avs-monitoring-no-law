@@ -210,40 +210,44 @@
             "name": "ovw-health"
           },
           {
-            "type": 10,
+            "type": 3,
             "content": {
-              "chartId": "ovw-cpu", "version": "MetricsItem/2.0", "size": 0, "chartType": 5,
-              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
-              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
-              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--CpuUsageAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
-              "title": "CPU Usage (%) by Cluster", "showRefreshButton": true
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.avs/privateclouds' or type == 'microsoft.avs/privateclouds/clusters'\r\n| extend pcName = iff(type == 'microsoft.avs/privateclouds', name, tostring(split(id, '/')[8]))\r\n| extend clusterName = iff(type == 'microsoft.avs/privateclouds', strcat(name, '/Management'), strcat(pcName, '/', name))\r\n| extend hosts = iff(type == 'microsoft.avs/privateclouds', toint(properties.managementCluster.clusterSize), toint(properties.clusterSize))\r\n| project clusterName, hosts\r\n| order by hosts desc",
+              "size": 0, "title": "Hosts by Cluster",
+              "noDataMessage": "No clusters found",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "piechart",
+              "chartSettings": { "seriesLabelSettings": [] }
             },
-            "customWidth": "33", "name": "ovw-cpu"
+            "customWidth": "33", "name": "ovw-pie-clusters"
           },
           {
-            "type": 10,
+            "type": 3,
             "content": {
-              "chartId": "ovw-mem", "version": "MetricsItem/2.0", "size": 0, "chartType": 5,
-              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
-              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
-              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--MemUsageAverage", "aggregation": 4, "splitBy": [ "clustername" ] } ],
-              "title": "Memory Usage (%) by Cluster", "showRefreshButton": true
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.avs/privateclouds'\r\n| where id in ({AVSInstance})\r\n| extend skuName = tostring(sku.name)\r\n| extend hostCount = toint(properties.managementCluster.clusterSize)\r\n| summarize Hosts = sum(hostCount) by skuName\r\n| order by Hosts desc",
+              "size": 0, "title": "Hosts by SKU",
+              "noDataMessage": "No private clouds found",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "piechart"
             },
-            "customWidth": "33", "name": "ovw-mem"
+            "customWidth": "33", "name": "ovw-pie-sku"
           },
           {
-            "type": 10,
+            "type": 3,
             "content": {
-              "chartId": "ovw-disk", "version": "MetricsItem/2.0", "size": 0, "chartType": 5,
-              "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
-              "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
-              "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
-              "metrics": [ { "namespace": "microsoft.avs/privateclouds", "metric": "microsoft.avs/privateclouds--DiskUsedPercentage", "aggregation": 4, "splitBy": [ "dsname" ] } ],
-              "title": "Datastore Used (%) by Datastore", "showRefreshButton": true
+              "version": "KqlItem/1.0",
+              "query": "resources\r\n| where type == 'microsoft.avs/privateclouds'\r\n| where id in ({AVSInstance})\r\n| extend hostCount = toint(properties.managementCluster.clusterSize)\r\n| summarize Hosts = sum(hostCount) by location\r\n| order by Hosts desc",
+              "size": 0, "title": "Hosts by Region",
+              "noDataMessage": "No private clouds found",
+              "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+              "crossComponentResources": [ "{Subscription}" ],
+              "visualization": "piechart"
             },
-            "customWidth": "33", "name": "ovw-disk"
+            "customWidth": "33", "name": "ovw-pie-region"
           }
         ]
       },
