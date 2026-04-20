@@ -212,7 +212,7 @@
           {
             "type": 10,
             "content": {
-              "chartId": "ovw-cpu", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "chartId": "ovw-cpu", "version": "MetricsItem/2.0", "size": 0, "chartType": 5,
               "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
               "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
               "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
@@ -224,7 +224,7 @@
           {
             "type": 10,
             "content": {
-              "chartId": "ovw-mem", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "chartId": "ovw-mem", "version": "MetricsItem/2.0", "size": 0, "chartType": 5,
               "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
               "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
               "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
@@ -236,7 +236,7 @@
           {
             "type": 10,
             "content": {
-              "chartId": "ovw-disk", "version": "MetricsItem/2.0", "size": 0, "chartType": 2,
+              "chartId": "ovw-disk", "version": "MetricsItem/2.0", "size": 0, "chartType": 5,
               "resourceType": "Microsoft.AVS/privateClouds", "metricScope": 0,
               "resourceParameter": "AVSInstance", "resourceIds": [ "{AVSInstance}" ],
               "timeContextFromParameter": "TimeRange", "timeContext": { "durationMs": 86400000 },
